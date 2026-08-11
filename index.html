@@ -341,11 +341,11 @@
       <input type="text" id="period" placeholder="----">
     </div>
     <div class="field" style="grid-column:1/-1; border-top:1px dashed var(--line-soft); padding-top:12px;">
-      <label>Anthropic API key <span style="text-transform:none; letter-spacing:0;">— required for Draft bid / Forecast / Data loader when hosted outside claude.ai</span></label>
-      <input type="password" id="apiKey" placeholder="sk-ant-----" autocomplete="off">
+      <label>Gemini API key <span style="text-transform:none; letter-spacing:0;">— required for Draft bid / Forecast / Data loader</span></label>
+      <input type="password" id="apiKey" placeholder="AIza-----" autocomplete="off">
       <div style="font-size:9.5px; color:var(--dim); margin-top:5px; letter-spacing:0.02em;">
-        Stored only in this browser (localStorage), never sent anywhere except directly to Anthropic. Get one at
-        <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--cyan);">console.anthropic.com</a>.
+        Stored only in this browser (localStorage), never sent anywhere except directly to Google. Get a free key at
+        <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--cyan);">aistudio.google.com/apikey</a>.
       </div>
     </div>
   </div>
@@ -459,25 +459,36 @@ let state = {
 
 function makeId(){ return 'r_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7); }
 
-const NO_KEY_MSG = 'No Anthropic API key set — add one under » edit crew base / seniority / bid month.';
+const GEMINI_MODEL = 'gemini-2.5-flash';
+const NO_KEY_MSG = 'No Gemini API key set — add one under » edit crew base / seniority / bid month.';
 
-async function callClaude({system, messages}){
+// Converts the Anthropic-style content blocks used elsewhere in this file
+// (text / image / document) into Gemini's "parts" format.
+function toGeminiParts(content){
+  if(typeof content === 'string') return [{text: content}];
+  return content.map(block=>{
+    if(block.type === 'text') return {text: block.text};
+    if(block.type === 'image') return {inline_data:{mime_type: block.source.media_type, data: block.source.data}};
+    if(block.type === 'document') return {inline_data:{mime_type: block.source.media_type || 'application/pdf', data: block.source.data}};
+    return {text: ''};
+  });
+}
+
+async function callAI({system, messages}){
   if(!state.apiKey || !state.apiKey.trim()){
     throw new Error(NO_KEY_MSG);
   }
   const body = {
-    model:"claude-sonnet-4-6",
-    max_tokens:1000,
-    messages: messages
+    contents: messages.map(m=>({role: m.role === 'assistant' ? 'model' : 'user', parts: toGeminiParts(m.content)})),
+    generationConfig: {maxOutputTokens: 1000}
   };
-  if(system) body.system = system;
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  if(system) body.systemInstruction = {parts:[{text: system}]};
+
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
     method:"POST",
     headers:{
       "Content-Type":"application/json",
-      "x-api-key": state.apiKey.trim(),
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true"
+      "x-goog-api-key": state.apiKey.trim()
     },
     body: JSON.stringify(body)
   });
@@ -486,9 +497,11 @@ async function callClaude({system, messages}){
     throw new Error(`API error ${response.status}: ${errText.slice(0,200)}`);
   }
   const data = await response.json();
-  const textBlock = (data.content || []).find(b=>b.type==='text');
-  if(!textBlock) throw new Error('No text in response');
-  return textBlock.text.trim();
+  const parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
+  if(!parts || !parts.length) throw new Error('No text in response');
+  const text = parts.map(p=>p.text||'').join('').trim();
+  if(!text) throw new Error('No text in response');
+  return text;
 }
 
 function load(){
@@ -709,7 +722,7 @@ Rules:
   const userMsg = `${context}\n\nWhat I want:\n${want}`;
 
   try{
-    const rawText = await callClaude({
+    const rawText = await callAI({
       system: systemPrompt,
       messages:[{role:"user", content:userMsg}]
     });
@@ -775,7 +788,7 @@ Guidance:
   const userMsg = `${context}\n\nFull bid stack, sorted by points (high to low within each pool):\n${rackText}`;
 
   try{
-    const rawText = await callClaude({
+    const rawText = await callAI({
       system: systemPrompt,
       messages:[{role:"user", content:userMsg}]
     });
@@ -905,7 +918,7 @@ async function handleFileImport(event){
 
     statusEl.textContent = 'analyzing...';
 
-    const summary = await callClaude({
+    const summary = await callAI({
       messages:[{role:"user", content:userContent}]
     });
 
