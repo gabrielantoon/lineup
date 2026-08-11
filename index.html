@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Lineup — Bid Display</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a1c2b'/%3E%3Crect x='4' y='4' width='24' height='24' fill='none' stroke='%233ddc5a' stroke-width='1.5'/%3E%3Ctext x='7' y='21' font-family='monospace' font-weight='bold' font-size='13' fill='%23e8ecec'%3ELU%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a1c2b;
+    --bg-2:#061119;
+    --panel:#0f2637;
+    --panel-2:#132e42;
+    --line: rgba(232,236,236,0.16);
+    --line-soft: rgba(232,236,236,0.08);
+    --white:#e8ecec;
+    --dim:#7d94a3;
+    --green:#3ddc5a;
+    --green-dim:#1f8534;
+    --amber:#e8b23d;
+    --amber-dim:#8a6a1f;
+    --red:#e0453d;
+    --red-dim:#8a2b26;
+    --cyan:#4dd8e0;
+    --cyan-dim:#2a7d82;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: var(--bg-2);
+    color:var(--white);
+    font-family:'IBM Plex Mono', monospace;
+    min-height:100vh;
+    padding:18px 12px 50px;
+  }
+  ::selection{background:var(--cyan); color:#04191c;}
+  button:focus-visible, input:focus-visible, textarea:focus-visible{
+    outline:2px solid var(--cyan); outline-offset:2px;
+  }
+
+  .frame{
+    max-width:720px; margin:0 auto; position:relative;
+    background:var(--bg); border:1px solid var(--line); border-radius:6px;
+    padding:22px 20px 28px;
+  }
+  .frame::before{
+    content:'';
+    position:absolute; inset:0; pointer-events:none; border-radius:6px;
+    background-image: repeating-linear-gradient(180deg, rgba(232,236,236,0.018) 0px, rgba(232,236,236,0.018) 1px, transparent 1px, transparent 3px);
+  }
+  .corner{position:absolute; width:14px; height:14px; border-color:var(--cyan-dim);}
+  .corner.tl{top:8px; left:8px; border-top:1px solid; border-left:1px solid;}
+  .corner.tr{top:8px; right:8px; border-top:1px solid; border-right:1px solid;}
+  .corner.bl{bottom:8px; left:8px; border-bottom:1px solid; border-left:1px solid;}
+  .corner.br{bottom:8px; right:8px; border-bottom:1px solid; border-right:1px solid;}
+
+  /* MASTHEAD */
+  .masthead{text-align:center; margin-bottom:14px;}
+  .masthead h1{
+    font-family:'Share Tech Mono', monospace; font-weight:400; font-size:26px; letter-spacing:0.24em;
+    margin:0; color:var(--white);
+  }
+  .masthead .sub{
+    font-size:10px; letter-spacing:0.22em; color:var(--cyan); text-transform:uppercase; margin-top:4px;
+  }
+  .rule{height:1px; background:linear-gradient(90deg, transparent, var(--line) 15%, var(--line) 85%, transparent); margin:14px 0;}
+
+  /* STATUS ROW: base/fleet/period + seniority */
+  .status-row{
+    display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap;
+    margin-bottom:6px;
+  }
+  .status-left{font-size:11px; color:var(--dim); letter-spacing:0.05em; padding-top:4px;}
+  .status-left .sl-line{text-transform:uppercase;}
+
+  .sen-panel{
+    cursor:pointer; text-align:right; border:1px solid var(--line); border-radius:4px;
+    padding:8px 12px; background:var(--panel); min-width:150px;
+  }
+  .sen-panel .sp-label{font-size:9px; letter-spacing:0.14em; color:var(--dim); text-transform:uppercase;}
+  .sen-panel .sp-value{
+    font-family:'Share Tech Mono',monospace; font-size:17px; letter-spacing:0.04em; margin:3px 0 6px; color:var(--green);
+  }
+  .sen-panel .sp-value.unset{color:var(--amber);}
+  .seg-gauge{display:flex; gap:2px; justify-content:flex-end;}
+  .seg{width:6px; height:9px; background:var(--line-soft); border-radius:1px;}
+  .seg.lit{background:var(--green);}
+
+  .setup-toggle{
+    background:none; border:none; color:var(--dim); font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px; letter-spacing:0.05em; cursor:pointer; padding:8px 0 0; text-decoration:underline;
+    text-underline-offset:3px; text-decoration-color:var(--line);
+  }
+  .setup-toggle:hover{color:var(--cyan);}
+
+  /* SETUP PANEL — MCDU-style entry fields */
+  .setup{
+    display:none; grid-template-columns:1fr 1fr; gap:14px 22px;
+    padding:14px 0 4px; border-top:1px dashed var(--line-soft); margin-top:10px;
+  }
+  .setup.open{display:grid; animation:fadeIn .15s ease;}
+  @keyframes fadeIn{from{opacity:0;} to{opacity:1;}}
+  .field label{
+    display:block; font-size:9px; letter-spacing:0.1em; text-transform:uppercase; color:var(--dim);
+    margin-bottom:4px;
+  }
+  .field input{
+    width:100%; background:transparent; border:none; border-bottom:1px solid var(--line);
+    color:var(--cyan); font-family:'IBM Plex Mono', monospace; font-weight:600; font-size:14px; padding:5px 2px;
+  }
+  .field input:focus{outline:none; border-bottom-color:var(--cyan); border-bottom-width:2px;}
+  .field input::placeholder{color:var(--dim); font-weight:400;}
+
+  /* SECTION LABEL */
+  .sec-label{
+    font-family:'Share Tech Mono',monospace; font-weight:400; font-size:12px; letter-spacing:0.16em;
+    text-transform:uppercase; color:var(--white); margin:24px 0 10px; display:flex; align-items:center; gap:10px;
+  }
+  .sec-label::before{content:'▸'; color:var(--cyan); font-size:11px;}
+  .sec-label::after{content:''; flex:1; border-top:1px dashed var(--line-soft);}
+  .sec-count{
+    font-family:'IBM Plex Mono',monospace; font-weight:400; font-size:10px; color:var(--dim);
+    text-transform:none; letter-spacing:0.02em; white-space:nowrap;
+  }
+
+  /* DECK — scratchpad entry */
+  .deck textarea{
+    width:100%; min-height:74px; resize:vertical; background:var(--panel);
+    border:1px solid var(--line); color:var(--cyan); font-family:'IBM Plex Mono',monospace;
+    font-weight:500; font-size:14px; line-height:1.6; padding:11px 12px; border-radius:4px;
+  }
+  .deck textarea:focus{outline:none; border-color:var(--cyan);}
+  .deck textarea::placeholder{color:var(--dim); font-weight:400;}
+  .deck-foot{display:flex; justify-content:space-between; align-items:center; margin-top:10px; gap:10px; flex-wrap:wrap;}
+  .hint{font-size:10px; color:var(--dim); letter-spacing:0.02em;}
+
+  /* PUSH BUTTONS */
+  .pb{
+    font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:11px; letter-spacing:0.05em;
+    text-transform:uppercase; background:var(--panel); color:var(--white); border:1px solid var(--line);
+    border-radius:4px; padding:9px 15px; cursor:pointer; transition:box-shadow .15s, border-color .15s, background .15s;
+    white-space:nowrap;
+  }
+  .pb:hover{border-color:var(--cyan); box-shadow:0 0 8px rgba(77,216,224,0.35); color:var(--cyan);}
+  .pb:active{background:var(--panel-2); box-shadow:0 0 4px rgba(77,216,224,0.5) inset;}
+  .pb:disabled{opacity:0.4; cursor:wait; box-shadow:none;}
+  .pb.primary{border-color:var(--cyan); color:var(--cyan);}
+  .pb.primary:hover{box-shadow:0 0 12px rgba(77,216,224,0.5);}
+  .pb.small{padding:7px 11px; font-size:10px;}
+  .pb.danger{border-color:var(--red-dim); color:var(--red);}
+  .pb.danger:hover{border-color:var(--red); box-shadow:0 0 8px rgba(224,69,61,0.35); color:var(--red);}
+
+  /* RACK — system status lines */
+  #rack{list-style:none; margin:0; padding:0;}
+  .row-head{
+    display:flex; gap:12px; align-items:center; font-size:9px; color:var(--dim);
+    text-transform:uppercase; letter-spacing:0.1em; padding:0 2px 6px; border-bottom:1px solid var(--line-soft);
+  }
+  .row-head .rh-pts{width:64px; flex-shrink:0; text-align:center;}
+  .row-head .rh-body{flex:1;}
+  .row-head .rh-del{width:16px; flex-shrink:0;}
+
+  @keyframes rowIn{from{opacity:0;} to{opacity:1;}}
+
+  .strip{
+    display:flex; align-items:center; gap:12px; padding:11px 2px;
+    border-bottom:1px solid var(--line-soft); animation:rowIn .18s ease;
+  }
+  .strip:hover{background:rgba(77,216,224,0.035);}
+
+  .ind{
+    flex-shrink:0; width:9px; height:9px; margin-top:2px;
+  }
+  .ind.type-desire{background:var(--green); border-radius:1px;}
+  .ind.type-avoid{background:var(--amber); border-radius:50%;}
+
+  .pts-box{flex-shrink:0; width:64px; text-align:center;}
+  .pts-input{
+    width:100%; text-align:center; font-family:'Share Tech Mono',monospace; font-size:15px;
+    background:var(--panel); border:1px solid var(--line); border-radius:3px; padding:4px 2px;
+  }
+  .pts-input.type-desire{color:var(--green);}
+  .pts-input.type-avoid{color:var(--amber);}
+  .pts-input:focus{outline:none; border-color:var(--cyan);}
+  .gauge-mini{display:flex; gap:1.5px; margin-top:4px; justify-content:center;}
+  .gauge-mini .gseg{width:3.5px; height:6px; background:var(--line-soft); border-radius:1px;}
+  .gauge-mini .gseg.lit.type-desire{background:var(--green);}
+  .gauge-mini .gseg.lit.type-avoid{background:var(--amber);}
+
+  .strip-body{flex:1; min-width:0; display:flex; gap:10px; align-items:flex-start;}
+  .strip-main{flex:1; min-width:0;}
+  .row1{display:flex; gap:8px; align-items:baseline; margin-bottom:3px; flex-wrap:wrap;}
+  .tag{font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:700; letter-spacing:0.03em;}
+  .tag.type-desire{color:var(--green);}
+  .tag.type-avoid{color:var(--amber);}
+  .cat-label{font-size:9.5px; letter-spacing:0.05em; text-transform:uppercase; color:var(--dim);}
+  .strip .text{font-size:13.5px; line-height:1.4; color:var(--white);}
+  .strategy{font-size:9.5px; letter-spacing:0.03em; margin-top:4px; text-transform:uppercase; color:var(--dim);}
+  .strategy.likely{color:var(--green);}
+  .strategy.longshot{color:var(--red);}
+
+  .del-btn{
+    flex-shrink:0; width:16px; background:none; border:none; color:var(--dim); font-size:13px;
+    cursor:pointer; padding:2px; line-height:1; transition:color .12s;
+  }
+  .del-btn:hover{color:var(--red);}
+
+  .empty-state{
+    border:1px dashed var(--line); padding:24px 18px; text-align:center; margin:6px 0; border-radius:4px;
+    font-size:12px; color:var(--dim); line-height:1.9;
+  }
+  .empty-state .ee-tag{
+    font-family:'Share Tech Mono',monospace; font-size:11px; letter-spacing:0.12em; margin-bottom:10px; color:var(--amber);
+  }
+
+  .actions{display:flex; gap:10px; margin-top:20px; flex-wrap:wrap;}
+
+  .phase2{
+    margin-top:20px; padding-top:14px; border-top:1px dashed var(--line-soft);
+    font-size:10px; color:var(--dim); line-height:1.75;
+  }
+  .phase2 b{color:var(--white);}
+
+  .loader-box{
+    border:1px dashed var(--line); border-radius:4px; padding:20px 18px; margin:6px 0;
+    font-size:12px; color:var(--dim); line-height:1.9; background:var(--panel);
+  }
+
+  .footer-mark{
+    margin-top:36px; text-align:center; font-size:9px; letter-spacing:0.18em; color:var(--dim);
+    text-transform:uppercase;
+  }
+
+  /* MODAL */
+  .modal-bg{
+    position:fixed; inset:0; background:rgba(4,10,15,0.72); display:none;
+    align-items:center; justify-content:center; z-index:50; padding:20px;
+  }
+  .modal-bg.open{display:flex;}
+  .modal{
+    background:var(--bg); border:1px solid var(--line); border-radius:6px;
+    padding:22px; max-width:480px; width:100%; max-height:82vh; overflow:auto;
+    box-shadow:0 0 40px rgba(0,0,0,0.5);
+  }
+  .modal h3{
+    font-family:'Share Tech Mono',monospace; font-weight:400; font-size:15px; letter-spacing:0.1em;
+    text-transform:uppercase; color:var(--white); margin:0 0 14px; padding-bottom:8px;
+    border-bottom:1px solid var(--line);
+  }
+  .modal pre{
+    font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--white);
+    white-space:pre-wrap; line-height:1.7; background:var(--panel); padding:13px; border-radius:4px;
+    margin:0 0 16px; border:1px solid var(--line);
+  }
+  .modal-actions{display:flex; justify-content:flex-end; gap:8px;}
+
+  /* forecast alert message + list */
+  .alert-msg{
+    display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:4px; margin-bottom:16px;
+    font-family:'Share Tech Mono',monospace; font-weight:400; font-size:15px; letter-spacing:0.08em; text-transform:uppercase;
+    border-left:3px solid currentColor; background:var(--panel);
+  }
+  .alert-msg.strong{color:var(--green);}
+  .alert-msg.mixed{color:var(--amber);}
+  .alert-msg.weak{color:var(--red);}
+  .alert-msg.uncertain{color:var(--dim);}
+  .alert-msg .sym{font-size:13px;}
+  .forecast-summary{font-size:13.5px; line-height:1.6; color:var(--white); margin-bottom:18px;}
+  .fc-section{margin-bottom:14px;}
+  .fc-section-label{
+    font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase;
+    font-weight:700; margin-bottom:6px;
+  }
+  .fc-good{color:var(--green);}
+  .fc-bad{color:var(--amber);}
+  .fc-warn{color:var(--red);}
+  .fc-list{list-style:none; margin:0; padding:0;}
+  .fc-list li{
+    font-size:13px; line-height:1.5; color:var(--white); padding:6px 0 6px 15px;
+    border-bottom:1px solid var(--line-soft); position:relative;
+  }
+  .fc-list li:last-child{border-bottom:none;}
+  .fc-list li::before{content:'—'; position:absolute; left:0; color:var(--dim);}
+  .fc-list:empty::after{
+    content:'None flagged'; font-size:11px; color:var(--dim); font-style:italic; display:block; padding:2px 0;
+  }
+
+  @media (max-width:560px){
+    .frame{padding:18px 14px 24px;}
+    .masthead h1{font-size:21px; letter-spacing:0.16em;}
+    .setup{grid-template-columns:1fr;}
+    .row-head{display:none;}
+    .strip{flex-wrap:wrap;}
+    .pts-box{width:56px;}
+  }
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+
+  <div class="masthead">
+    <h1>LINEUP</h1>
+    <div class="sub">Priority bid display · v1.0.0</div>
+  </div>
+  <div class="rule"></div>
+
+  <div class="status-row">
+    <div class="status-left">
+      <div class="sl-line" id="subline">CONFIGURE CREW BASE &amp; SENIORITY</div>
+    </div>
+    <div class="sen-panel" id="senBadge" onclick="toggleSetup()">
+      <div class="sp-label">Seniority</div>
+      <div class="sp-value unset" id="senDisplay">— NOT SET —</div>
+      <div class="seg-gauge" id="senGauge"></div>
+    </div>
+  </div>
+  <button class="setup-toggle" id="setupToggle" onclick="toggleSetup()">» edit crew base / seniority / bid month</button>
+  <div class="setup" id="setupPanel">
+    <div class="field">
+      <label>Seniority number</label>
+      <input type="text" id="senNum" placeholder="----" inputmode="numeric">
+    </div>
+    <div class="field">
+      <label>Seniority percentile (0–100)</label>
+      <input type="text" id="senPct" placeholder="----" inputmode="numeric">
+    </div>
+    <div class="field">
+      <label>Base</label>
+      <input type="text" id="base" placeholder="YUL" value="YUL">
+    </div>
+    <div class="field">
+      <label>Fleet / seat</label>
+      <input type="text" id="fleet" placeholder="A321neo FO" value="A321neo FO">
+    </div>
+    <div class="field" style="grid-column:1/-1;">
+      <label>Bid period</label>
+      <input type="text" id="period" placeholder="----">
+    </div>
+  </div>
+
+  <div class="sec-label">Draft entry</div>
+  <div class="deck">
+    <textarea id="wantInput" placeholder="e.g. Weekends off whenever possible, no report before 6am, more Europe pairings, avoid reserve in the first half of the month, keep trips under 4 days..."></textarea>
+    <div class="deck-foot">
+      <span class="hint" id="genHint">Converts to points-weighted bid entries</span>
+      <div style="display:flex; gap:10px;">
+        <button class="pb small" onclick="addManualStrip()">Add manually</button>
+        <button class="pb primary" id="genBtn" onclick="generateRules()">Draft bid</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label">Priority rack <span class="sec-count" id="rackCount">0 entries</span></div>
+  <div class="row-head">
+    <span class="rh-pts">Points</span>
+    <span class="rh-body">Entry</span>
+    <span class="rh-del"></span>
+  </div>
+  <ul id="rack"></ul>
+  <div class="empty-state" id="emptyState">
+    <div class="ee-tag">▲ NO ENTRIES ON FILE</div>
+    Describe what you want above, or add an entry manually.<br>
+    Entries sort automatically by points, high to low.
+  </div>
+
+  <div class="actions" id="actionsRow" style="display:none;">
+    <button class="pb primary" onclick="generateForecast()" id="forecastBtn">Forecast my line</button>
+    <button class="pb" onclick="exportList()">Export list</button>
+    <button class="pb danger" onclick="clearRack()">Clear rack</button>
+  </div>
+
+  <div class="sec-label">Data loader <span class="sec-count" id="importStatus">no file loaded</span></div>
+  <div class="loader-box" id="loaderBox">
+    <input type="file" id="fileInput" style="display:none;" onchange="handleFileImport(event)">
+    <div id="loaderIdle">
+      <div class="ee-tag" style="color:var(--cyan);">⇩ NO BID PACKAGE LOADED</div>
+      Load a screenshot, photo, PDF, CSV, or text export of your bid package — any file type works, it'll be read automatically.
+      <div style="margin-top:12px;">
+        <button class="pb primary small" onclick="document.getElementById('fileInput').click()">Load file</button>
+      </div>
+    </div>
+    <div id="loaderResult" style="display:none;">
+      <div class="row1" style="margin-bottom:8px;">
+        <span class="tag type-desire" id="loaderFileName">FILE.PDF</span>
+        <span class="cat-label" id="loaderFileMeta"></span>
+      </div>
+      <div class="text" id="loaderSummary" style="white-space:pre-wrap; line-height:1.55;"></div>
+      <div style="margin-top:12px; display:flex; gap:10px;">
+        <button class="pb small" onclick="document.getElementById('fileInput').click()">Load different file</button>
+        <button class="pb danger small" onclick="clearImport()">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="phase2">
+    <b>Note:</b> the loader reads and summarizes whatever you give it, but entries in the rack above still aren't automatically checked against it yet — that scoring/matching layer is the next build.
+  </div>
+
+  <div class="footer-mark">LINEUP v1.0.0 — end of display —</div>
+</div>
+
+<div class="modal-bg" id="exportModal">
+  <div class="modal">
+    <h3>Export — points order</h3>
+    <pre id="exportText"></pre>
+    <div class="modal-actions">
+      <button class="pb small" onclick="copyExport()">Copy</button>
+      <button class="pb primary small" onclick="closeExport()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="forecastModal">
+  <div class="modal">
+    <h3>Forecast</h3>
+    <div id="forecastLoading" style="font-size:12px; color:var(--dim); padding:10px 0;">Working...</div>
+    <div id="forecastContent" style="display:none;">
+      <div id="verdictBadge" class="alert-msg"><span class="sym">●</span><span id="verdictText">STRONG LINE</span></div>
+      <div id="forecastSummary" class="forecast-summary"></div>
+
+      <div class="fc-section">
+        <div class="fc-section-label fc-good">✓ Likely to hold</div>
+        <ul id="fcHits" class="fc-list"></ul>
+      </div>
+      <div class="fc-section">
+        <div class="fc-section-label fc-bad">✕ Likely to get bumped</div>
+        <ul id="fcMisses" class="fc-list"></ul>
+      </div>
+      <div class="fc-section" id="fcConflictsSection" style="display:none;">
+        <div class="fc-section-label fc-warn">⚠ Working against each other</div>
+        <ul id="fcConflicts" class="fc-list"></ul>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="pb primary small" onclick="closeForecast()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'lineup_v1';
+const LEGACY_KEY = 'stripboard_v1';
+let state = {
+  senNum:'', senPct:'', base:'YUL', fleet:'A321neo FO', period:'',
+  rules: []
+};
+
+function makeId(){ return 'r_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7); }
+
+function load(){
+  try{
+    let raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw){
+      const legacy = localStorage.getItem(LEGACY_KEY);
+      if(legacy) raw = legacy;
+    }
+    if(raw) state = Object.assign(state, JSON.parse(raw));
+  }catch(e){ console.error('load failed', e); }
+  state.rules.forEach(r=>{
+    if(!r.id) r.id = makeId();
+    if(typeof r.points !== 'number') r.points = 500;
+  });
+}
+function save(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch(e){ console.error('save failed', e); }
+}
+
+function toggleSetup(){
+  document.getElementById('setupPanel').classList.toggle('open');
+}
+
+function syncSetupInputs(){
+  document.getElementById('senNum').value = state.senNum;
+  document.getElementById('senPct').value = state.senPct;
+  document.getElementById('base').value = state.base;
+  document.getElementById('fleet').value = state.fleet;
+  document.getElementById('period').value = state.period;
+  renderHeader();
+}
+
+['senNum','senPct','base','fleet','period'].forEach(id=>{
+  document.addEventListener('DOMContentLoaded', ()=>{
+    document.getElementById(id).addEventListener('input', (e)=>{
+      state[id] = e.target.value;
+      save();
+      renderHeader();
+    });
+  });
+});
+
+function buildSegGauge(containerId, pct, count, litColor){
+  const el = document.getElementById(containerId);
+  const filled = Math.max(0, Math.min(count, Math.round((Math.max(0,Math.min(100,pct))/100)*count)));
+  el.innerHTML = '';
+  for(let i=0;i<count;i++){
+    const s = document.createElement('div');
+    s.className = 'seg' + (i < filled ? ' lit' : '');
+    el.appendChild(s);
+  }
+}
+
+function renderHeader(){
+  const pct = state.senPct ? state.senPct + '%' : '—';
+  const num = state.senNum ? '#' + state.senNum : '';
+  const hasSet = state.senNum || state.senPct;
+  const disp = document.getElementById('senDisplay');
+  disp.textContent = hasSet ? `${num} ${pct}`.trim() : '— NOT SET —';
+  disp.classList.toggle('unset', !hasSet);
+  const pctNum = parseFloat(state.senPct);
+  buildSegGauge('senGauge', isFinite(pctNum) ? pctNum : 0, 16, 'var(--green)');
+  const parts = [state.fleet, state.base, state.period].filter(Boolean);
+  document.getElementById('subline').textContent = parts.length ? parts.join(' · ').toUpperCase() : 'CONFIGURE CREW BASE & SENIORITY';
+}
+
+function escapeHtml(s){
+  return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderRack(){
+  const rack = document.getElementById('rack');
+  const empty = document.getElementById('emptyState');
+  const actions = document.getElementById('actionsRow');
+  const rowHead = document.querySelector('.row-head');
+  rack.innerHTML = '';
+  if(state.rules.length === 0){
+    empty.style.display = 'block';
+    actions.style.display = 'none';
+    rowHead.style.display = 'none';
+  } else {
+    empty.style.display = 'none';
+    actions.style.display = 'flex';
+    rowHead.style.display = 'flex';
+  }
+  document.getElementById('rackCount').textContent = `${state.rules.length} entr${state.rules.length===1?'y':'ies'} · sorted by points`;
+
+  const sorted = state.rules.slice().sort((a,b)=> (b.points||0) - (a.points||0));
+
+  sorted.forEach((r)=>{
+    const li = document.createElement('li');
+    li.className = 'strip';
+    li.dataset.id = r.id;
+
+    const strategyClass = r.strategy === 'likely' ? 'likely' : (r.strategy === 'longshot' ? 'longshot' : '');
+    const strategyLabel = r.strategy ? r.strategy.toUpperCase() : '';
+    const pts = Math.max(0, Math.min(1000, r.points||0));
+    const tagText = r.type === 'desire' ? 'DESIRE' : 'AVOID';
+    const segCount = 10;
+    const litCount = Math.round((pts/1000)*segCount);
+    let gaugeHtml = '';
+    for(let i=0;i<segCount;i++){
+      gaugeHtml += `<div class="gseg${i<litCount ? ' lit type-'+r.type : ''}"></div>`;
+    }
+
+    li.innerHTML = `
+      <div class="ind type-${r.type}"></div>
+      <div class="pts-box">
+        <input type="number" class="pts-input type-${r.type}" min="0" max="1000" step="10" value="${pts}" data-id="${r.id}">
+        <div class="gauge-mini">${gaugeHtml}</div>
+      </div>
+      <div class="strip-body">
+        <div class="strip-main">
+          <div class="row1">
+            <span class="tag type-${r.type}">${tagText}</span>
+            <span class="cat-label">${escapeHtml(r.category || 'GENERAL')}</span>
+          </div>
+          <div class="text">${escapeHtml(r.text)}</div>
+          ${strategyLabel ? `<div class="strategy ${strategyClass}">${strategyLabel}${r.note ? ' — ' + escapeHtml(r.note) : ''}</div>` : ''}
+        </div>
+      </div>
+      <button class="del-btn" title="Remove" data-id="${r.id}">✕</button>
+    `;
+
+    li.querySelector('.pts-input').addEventListener('change', (e)=>{
+      updatePoints(e.target.dataset.id, e.target.value);
+    });
+    li.querySelector('.pts-input').addEventListener('input', (e)=>{
+      const v = Math.max(0, Math.min(1000, parseInt(e.target.value)||0));
+      const lit = Math.round((v/1000)*segCount);
+      const segs = li.querySelectorAll('.gseg');
+      segs.forEach((seg,i)=>{
+        seg.className = 'gseg' + (i<lit ? ' lit type-'+r.type : '');
+      });
+    });
+    li.querySelector('.del-btn').addEventListener('click', (e)=>{
+      removeRule(e.target.dataset.id);
+    });
+
+    rack.appendChild(li);
+  });
+}
+
+function updatePoints(id, value){
+  const v = Math.max(0, Math.min(1000, parseInt(value)||0));
+  const rule = state.rules.find(r=>r.id===id);
+  if(rule){ rule.points = v; save(); renderRack(); }
+}
+
+function removeRule(id){
+  state.rules = state.rules.filter(r=>r.id!==id);
+  renderRack();
+  save();
+}
+
+function clearRack(){
+  if(state.rules.length && !confirm('Clear all entries from the rack?')) return;
+  state.rules = [];
+  renderRack();
+  save();
+}
+
+function addManualStrip(){
+  state.rules.push({
+    id: makeId(),
+    category:'GENERAL', type:'desire', text:'New entry — click to edit via export, or describe in the box above',
+    points: 500, strategy:'', note:''
+  });
+  renderRack();
+  save();
+}
+
+async function generateRules(){
+  const want = document.getElementById('wantInput').value.trim();
+  if(!want){ document.getElementById('wantInput').focus(); return; }
+
+  const btn = document.getElementById('genBtn');
+  const hint = document.getElementById('genHint');
+  btn.disabled = true;
+  btn.textContent = 'Working...';
+  hint.textContent = 'Converting to points-weighted bid entries...';
+
+  const senContext = (state.senNum || state.senPct)
+    ? `Seniority number ${state.senNum || 'unknown'}, percentile ${state.senPct || 'unknown'}%.`
+    : `Seniority not provided — treat as unknown, do not assume strong or weak standing.`;
+
+  const context = `Pilot: ${state.fleet || 'A321 FO'} based ${state.base || 'YUL'}, bidding for ${state.period || 'the upcoming period'} at Air Transat. ${senContext}`;
+
+  const systemPrompt = `You convert a pilot's plain-language schedule wants into a Jeppesen PBS (Preferential Bidding System) bid stack. Jeppesen uses a POINTS system, not a simple ranked list: each bid entry gets a point value from 0-1000, set independently (Desire and Avoid are separate point pools — a Desire entry's points don't compete against an Avoid entry's points). Higher points = the pilot wants that entry satisfied more strongly. Something the pilot really wants should get points close to 1000.
+
+Output ONLY valid JSON, no markdown fences, no preamble. Format:
+{"rules":[{"category":"one of the exact Jeppesen bid types listed below","type":"desire|avoid","text":"short rule, under 14 words, plain language","points":700,"strategy":"likely|moderate|longshot","note":"under 8 words on why, given seniority"}]}
+
+Jeppesen bid types — the valid categories DEPEND on whether type is "desire" or "avoid":
+
+If type is "desire", category must be one of:
+Full day(s) off, Specific date off, Period/string of dates off, Work on date (hours), Work on date(s), Work on day of week (hours), Work on day(s), Check in, Check out, Station layover duration, Leg(s) per duty period, Pairing length - Credit, Pairing length - Days, Passing through, Specific flight, Specific flight with layover, Start at airport, Overlap days, Trip type, Aircraft type, Deadhead pattern, Region, Pairings, Time, Maximum expense, Fly with
+
+If type is "avoid", category must be one of (note: no days-off options and no Maximum expense — Jeppesen doesn't allow avoiding those):
+Work on date (hours), Work on date(s), Work on day of week (hours), Work on day(s), Check in, Check out, Station layover duration, Leg(s) per duty period, Pairing length - Credit, Pairing length - Days, Passing through, Specific flight, Specific flight with layover, Start at airport, Overlap days, Trip type, Aircraft type, Deadhead pattern, Region, Pairings, Time, Fly with
+
+Never assign a desire-only category (like "Full day(s) off") to an avoid rule — rephrase it instead (e.g. wanting weekends off becomes a "desire" rule using "Full day(s) off" or "Period/string of dates off", not an "avoid" rule).
+
+If the pilot wants to avoid turns (a turn = an out-and-back pairing with no overnight, completed same day), use category "Pairing length - Days" with type "avoid" and phrase the text as avoiding 1-day pairings — NOT "Trip type" (Trip type in this system only distinguishes night duty vs. augmented crew, it has no turn/layover option).
+
+"Overlap days" means something specific and narrow: whether a pairing carries over into the NEXT bid period by a set number of days (e.g. a pairing starting in September that extends into October). It is NOT a general date-range or weekend field. Only use this category if the pilot is talking about trips spilling into the next month/bid period, not for wanting specific dates or days off.
+
+Rules:
+- "desire" = something you want, "avoid" = something you want to exclude.
+- Set "points" (0-1000) based on how strongly the pilot expressed the want/avoid in their own words — things stated as firm or repeated get points in the 800-1000 range, moderate preferences 400-700, minor nice-to-haves 100-350. Don't give everything 1000 — spread the values so the strongest want is genuinely distinguishable from the rest.
+- Use "strategy" to flag realism given seniority context: "likely" if reasonable at their standing, "longshot" if it needs high seniority they may not have, "moderate" otherwise. If seniority unknown, use "moderate" and note that.
+- Produce 5-9 rules max. Be specific and actionable, not vague.
+- Never invent seniority numbers or specific pairings — work only from what's given.`;
+
+  const userMsg = `${context}\n\nWhat I want:\n${want}`;
+
+  try{
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        model:"claude-sonnet-4-6",
+        max_tokens:1000,
+        system: systemPrompt,
+        messages:[{role:"user", content:userMsg}]
+      })
+    });
+    const data = await response.json();
+    const textBlock = (data.content || []).find(b=>b.type==='text');
+    if(!textBlock) throw new Error('No text in response');
+    let clean = textBlock.text.trim().replace(/^```json/,'').replace(/^```/,'').replace(/```$/,'').trim();
+    const parsed = JSON.parse(clean);
+    if(!parsed.rules || !Array.isArray(parsed.rules)) throw new Error('Bad shape');
+
+    state.rules = state.rules.concat(parsed.rules.map(r=>({
+      id: makeId(),
+      category: r.category || 'GENERAL',
+      type: ['desire','avoid'].includes(r.type) ? r.type : 'desire',
+      text: r.text || '',
+      points: Math.max(0, Math.min(1000, parseInt(r.points) || 500)),
+      strategy: ['likely','moderate','longshot'].includes(r.strategy) ? r.strategy : '',
+      note: r.note || ''
+    })));
+
+    document.getElementById('wantInput').value = '';
+    renderRack();
+    save();
+    hint.textContent = 'Converts to points-weighted bid entries';
+  }catch(err){
+    console.error(err);
+    hint.textContent = 'Something went wrong — try rephrasing or shortening your request';
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'Draft bid';
+  }
+}
+
+async function generateForecast(){
+  if(state.rules.length === 0) return;
+
+  const btn = document.getElementById('forecastBtn');
+  btn.disabled = true;
+  btn.textContent = 'Forecasting...';
+
+  document.getElementById('forecastModal').classList.add('open');
+  document.getElementById('forecastLoading').style.display = 'block';
+  document.getElementById('forecastLoading').textContent = 'Working...';
+  document.getElementById('forecastContent').style.display = 'none';
+
+  const senContext = (state.senNum || state.senPct)
+    ? `Seniority number ${state.senNum || 'unknown'}, percentile ${state.senPct || 'unknown'}%.`
+    : `Seniority not provided — treat as unknown, do not assume strong or weak standing, and say so.`;
+
+  const context = `Pilot: ${state.fleet || 'A321 FO'} based ${state.base || 'YUL'}, bidding for ${state.period || 'the upcoming period'} at Air Transat. ${senContext}`;
+
+  const sortedRules = state.rules.slice().sort((a,b)=>(b.points||0)-(a.points||0));
+  const rackText = sortedRules.map(r=> `[${r.type.toUpperCase()} — ${r.points||0}pts] ${r.category} — ${r.text}`).join('\n');
+
+  const systemPrompt = `You are a realistic, experienced crew scheduling advisor. A pilot has submitted a full PBS (Preferential Bidding System) bid stack in Jeppesen. Jeppesen uses a POINTS system: each Desire or Avoid entry has its own point value from 0-1000 (Desire and Avoid are separate point pools, not competing against each other directly). PBS builds each pilot the best line it can, weighted toward satisfying the highest-point entries first, constrained by their seniority relative to everyone else bidding the same trips.
+
+Output ONLY valid JSON, no markdown fences, no preamble. Format:
+{"verdict":"strong|mixed|weak|uncertain","summary":"one plain sentence, under 22 words, the single most important takeaway","hits":["short phrase, under 10 words, an entry likely to hold — 2-4 items"],"misses":["short phrase, under 10 words, an entry likely to get bumped — 2-4 items"],"conflicts":["short phrase, under 14 words, describing two entries working against each other — 0-2 items, omit array entries if none"]}
+
+Guidance:
+- "verdict": "strong" if most high-point entries are realistic given seniority, "weak" if most aren't, "mixed" if it's a real split, "uncertain" only if seniority is genuinely unknown.
+- hits/misses should reference the actual entries by their category or a short paraphrase of the text, not generic language.
+- conflicts should only include genuine tension between two specific entries in the stack — leave the array empty if there's nothing real to flag.
+- Do not invent specific pairings, dates, or trip numbers — you don't have that data. Base everything on points, seniority, and how competitive/specific each entry sounds.`;
+
+  const userMsg = `${context}\n\nFull bid stack, sorted by points (high to low within each pool):\n${rackText}`;
+
+  try{
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        model:"claude-sonnet-4-6",
+        max_tokens:1000,
+        system: systemPrompt,
+        messages:[{role:"user", content:userMsg}]
+      })
+    });
+    const data = await response.json();
+    const textBlock = (data.content || []).find(b=>b.type==='text');
+    if(!textBlock) throw new Error('No text in response');
+    let clean = textBlock.text.trim().replace(/^```json/,'').replace(/^```/,'').replace(/```$/,'').trim();
+    const parsed = JSON.parse(clean);
+    renderForecast(parsed);
+  }catch(err){
+    console.error(err);
+    document.getElementById('forecastLoading').style.display = 'block';
+    document.getElementById('forecastLoading').textContent = 'Something went wrong generating the forecast — try again in a moment.';
+    document.getElementById('forecastContent').style.display = 'none';
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'Forecast my line';
+  }
+}
+
+function renderForecast(parsed){
+  const verdict = ['strong','mixed','weak','uncertain'].includes(parsed.verdict) ? parsed.verdict : 'uncertain';
+  const badge = document.getElementById('verdictBadge');
+  badge.className = 'alert-msg ' + verdict;
+  const sym = {strong:'●', mixed:'▲', weak:'■', uncertain:'—'}[verdict];
+  badge.querySelector('.sym').textContent = sym;
+  document.getElementById('verdictText').textContent = verdict.toUpperCase() + ' LINE';
+
+  document.getElementById('forecastSummary').textContent = parsed.summary || '';
+
+  const hits = document.getElementById('fcHits');
+  hits.innerHTML = (parsed.hits||[]).map(h=>`<li>${escapeHtml(h)}</li>`).join('');
+
+  const misses = document.getElementById('fcMisses');
+  misses.innerHTML = (parsed.misses||[]).map(m=>`<li>${escapeHtml(m)}</li>`).join('');
+
+  const conflictsSection = document.getElementById('fcConflictsSection');
+  const conflicts = document.getElementById('fcConflicts');
+  if(parsed.conflicts && parsed.conflicts.length){
+    conflicts.innerHTML = parsed.conflicts.map(c=>`<li>${escapeHtml(c)}</li>`).join('');
+    conflictsSection.style.display = 'block';
+  } else {
+    conflictsSection.style.display = 'none';
+  }
+
+  document.getElementById('forecastLoading').style.display = 'none';
+  document.getElementById('forecastContent').style.display = 'block';
+}
+
+function closeForecast(){ document.getElementById('forecastModal').classList.remove('open'); }
+
+function exportList(){
+  const sorted = state.rules.slice().sort((a,b)=>(b.points||0)-(a.points||0));
+  const lines = sorted.map(r=> `[${r.type.toUpperCase()} — ${r.points||0}pts] ${r.category} — ${r.text}`);
+  const header = [state.fleet, state.base, state.period].filter(Boolean).join(' · ');
+  const text = (header ? header + '\n' + '—'.repeat(Math.min(header.length,40)) + '\n' : '') + lines.join('\n');
+  document.getElementById('exportText').textContent = text;
+  document.getElementById('exportModal').classList.add('open');
+}
+function closeExport(){ document.getElementById('exportModal').classList.remove('open'); }
+function copyExport(){
+  const text = document.getElementById('exportText').textContent;
+  navigator.clipboard && navigator.clipboard.writeText(text).catch(()=>{});
+}
+
+function readAsText(file){
+  return new Promise((res, rej)=>{
+    const r = new FileReader();
+    r.onload = ()=> res(r.result);
+    r.onerror = ()=> rej(new Error('read failed'));
+    r.readAsText(file);
+  });
+}
+function readAsBase64(file){
+  return new Promise((res, rej)=>{
+    const r = new FileReader();
+    r.onload = ()=> res(r.result.split(',')[1]);
+    r.onerror = ()=> rej(new Error('read failed'));
+    r.readAsDataURL(file);
+  });
+}
+
+const SUPPORTED_IMAGE_TYPES = ['image/jpeg','image/png','image/gif','image/webp'];
+const TEXT_LIKE_EXT = ['txt','csv','json','tsv','md','log','xml'];
+
+async function handleFileImport(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  event.target.value = '';
+
+  const statusEl = document.getElementById('importStatus');
+  statusEl.textContent = 'reading file...';
+
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  const mime = file.type || '';
+
+  let userContent;
+  let kindLabel;
+
+  try{
+    if(mime === 'application/pdf' || ext === 'pdf'){
+      kindLabel = 'PDF';
+      const b64 = await readAsBase64(file);
+      userContent = [
+        {type:'document', source:{type:'base64', media_type:'application/pdf', data:b64}},
+        {type:'text', text:'Summarize the bid-relevant content of this PDF for a pilot building a PBS bid. Focus on anything resembling pairings, trip lengths, dates, report times, destinations, or award/seniority history.'}
+      ];
+    } else if(SUPPORTED_IMAGE_TYPES.includes(mime)){
+      kindLabel = 'IMAGE';
+      const b64 = await readAsBase64(file);
+      userContent = [
+        {type:'image', source:{type:'base64', media_type:mime, data:b64}},
+        {type:'text', text:'Summarize the bid-relevant content of this image for a pilot building a PBS bid. Focus on anything resembling pairings, trip lengths, dates, report times, destinations, bid types/fields, or award/seniority history. If it is a screenshot of a bidding system UI, describe what feature or field it shows.'}
+      ];
+    } else if(mime.startsWith('text/') || TEXT_LIKE_EXT.includes(ext) || mime === '') {
+      kindLabel = ext ? ext.toUpperCase() : 'TEXT';
+      const text = await readAsText(file);
+      const trimmed = text.length > 12000 ? text.slice(0,12000) + '\n...[truncated]' : text;
+      userContent = `Summarize the bid-relevant content of this file for a pilot building a PBS bid. Focus on anything resembling pairings, trip lengths, dates, report times, destinations, or award/seniority history.\n\nFile contents:\n${trimmed}`;
+    } else if(ext === 'heic' || ext === 'heif'){
+      statusEl.textContent = 'unsupported format';
+      showImportResult(file, 'HEIC/HEIF', 'This format can\'t be read directly. On iPhone, choose "Copy Photo" instead of sharing the file, or export/share as JPEG or PNG, then load that instead.');
+      return;
+    } else {
+      // unknown binary (docx, xlsx, pages, etc.) — attempt as text, likely to fail gracefully
+      statusEl.textContent = 'unsupported format';
+      showImportResult(file, ext.toUpperCase() || 'UNKNOWN', `This file type isn't directly readable. Try exporting it as PDF, CSV, plain text, or a screenshot image instead.`);
+      return;
+    }
+
+    statusEl.textContent = 'analyzing...';
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        model:"claude-sonnet-4-6",
+        max_tokens:1000,
+        messages:[{role:"user", content:userContent}]
+      })
+    });
+    const data = await response.json();
+    const textBlock = (data.content || []).find(b=>b.type==='text');
+    const summary = textBlock ? textBlock.text.trim() : 'Could not read this file.';
+
+    showImportResult(file, kindLabel, summary);
+    statusEl.textContent = file.name;
+  }catch(err){
+    console.error(err);
+    statusEl.textContent = 'load failed';
+    showImportResult(file, 'ERROR', 'Something went wrong reading this file — try again, or try a different format (PDF, image, or text/CSV).');
+  }
+}
+
+function showImportResult(file, kindLabel, summary){
+  document.getElementById('loaderIdle').style.display = 'none';
+  document.getElementById('loaderResult').style.display = 'block';
+  document.getElementById('loaderFileName').textContent = kindLabel;
+  document.getElementById('loaderFileMeta').textContent = file.name + ' · ' + Math.round(file.size/1024) + ' KB';
+  document.getElementById('loaderSummary').textContent = summary;
+}
+
+function clearImport(){
+  document.getElementById('loaderIdle').style.display = 'block';
+  document.getElementById('loaderResult').style.display = 'none';
+  document.getElementById('importStatus').textContent = 'no file loaded';
+}
+
+// init
+load();
+syncSetupInputs();
+renderRack();
+if(!state.senNum && !state.senPct) document.getElementById('setupPanel').classList.add('open');
+</script>
+</body>
+</html>
