@@ -304,7 +304,7 @@
 
   <div class="masthead">
     <h1>LINEUP</h1>
-    <div class="sub">Priority bid display · v1.1.0</div>
+    <div class="sub">Priority bid display · v1.1.1</div>
   </div>
   <div class="rule"></div>
 
@@ -407,7 +407,7 @@
     <button class="pb danger" onclick="clearRack()">Clear rack</button>
   </div>
 
-  <div class="footer-mark">LINEUP v1.1.0 — end of display —</div>
+  <div class="footer-mark">LINEUP v1.1.1 — end of display —</div>
 </div>
 
 <div class="modal-bg" id="exportModal">
@@ -473,13 +473,15 @@ function toGeminiParts(content){
   });
 }
 
-async function callAI({system, messages}){
+async function callAI({system, messages, json}){
   if(!state.apiKey || !state.apiKey.trim()){
     throw new Error(NO_KEY_MSG);
   }
+  const generationConfig = {maxOutputTokens: 2048};
+  if(json) generationConfig.responseMimeType = "application/json";
   const body = {
     contents: messages.map(m=>({role: m.role === 'assistant' ? 'model' : 'user', parts: toGeminiParts(m.content)})),
-    generationConfig: {maxOutputTokens: 1000}
+    generationConfig
   };
   if(system) body.systemInstruction = {parts:[{text: system}]};
 
@@ -723,10 +725,17 @@ Rules:
   try{
     const rawText = await callAI({
       system: systemPrompt,
-      messages:[{role:"user", content:userMsg}]
+      messages:[{role:"user", content:userMsg}],
+      json: true
     });
     let clean = rawText.replace(/^```json/,'').replace(/^```/,'').replace(/```$/,'').trim();
-    const parsed = JSON.parse(clean);
+    let parsed;
+    try{
+      parsed = JSON.parse(clean);
+    }catch(parseErr){
+      console.error('JSON parse failed, raw response was:', rawText);
+      throw parseErr;
+    }
     if(!parsed.rules || !Array.isArray(parsed.rules)) throw new Error('Bad shape');
 
     state.rules = state.rules.concat(parsed.rules.map(r=>({
@@ -789,10 +798,17 @@ Guidance:
   try{
     const rawText = await callAI({
       system: systemPrompt,
-      messages:[{role:"user", content:userMsg}]
+      messages:[{role:"user", content:userMsg}],
+      json: true
     });
     let clean = rawText.replace(/^```json/,'').replace(/^```/,'').replace(/```$/,'').trim();
-    const parsed = JSON.parse(clean);
+    let parsed;
+    try{
+      parsed = JSON.parse(clean);
+    }catch(parseErr){
+      console.error('JSON parse failed, raw response was:', rawText);
+      throw parseErr;
+    }
     renderForecast(parsed);
   }catch(err){
     console.error(err);
