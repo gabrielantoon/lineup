@@ -304,7 +304,7 @@
 
   <div class="masthead">
     <h1>LINEUP</h1>
-    <div class="sub">Priority bid display · v1.0.1</div>
+    <div class="sub">Priority bid display · v1.1.0</div>
   </div>
   <div class="rule"></div>
 
@@ -350,37 +350,6 @@
     </div>
   </div>
 
-  <div class="sec-label">Draft entry</div>
-  <div class="deck">
-    <textarea id="wantInput" placeholder="e.g. Weekends off whenever possible, no report before 6am, more Europe pairings, avoid reserve in the first half of the month, keep trips under 4 days..."></textarea>
-    <div class="deck-foot">
-      <span class="hint" id="genHint">Converts to points-weighted bid entries</span>
-      <div style="display:flex; gap:10px;">
-        <button class="pb small" onclick="addManualStrip()">Add manually</button>
-        <button class="pb primary" id="genBtn" onclick="generateRules()">Draft bid</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="sec-label">Priority rack <span class="sec-count" id="rackCount">0 entries</span></div>
-  <div class="row-head">
-    <span class="rh-pts">Points</span>
-    <span class="rh-body">Entry</span>
-    <span class="rh-del"></span>
-  </div>
-  <ul id="rack"></ul>
-  <div class="empty-state" id="emptyState">
-    <div class="ee-tag">▲ NO ENTRIES ON FILE</div>
-    Describe what you want above, or add an entry manually.<br>
-    Entries sort automatically by points, high to low.
-  </div>
-
-  <div class="actions" id="actionsRow" style="display:none;">
-    <button class="pb primary" onclick="generateForecast()" id="forecastBtn">Forecast my line</button>
-    <button class="pb" onclick="exportList()">Export list</button>
-    <button class="pb danger" onclick="clearRack()">Clear rack</button>
-  </div>
-
   <div class="sec-label">Data loader <span class="sec-count" id="importStatus">no file loaded</span></div>
   <div class="loader-box" id="loaderBox">
     <input type="file" id="fileInput" style="display:none;" onchange="handleFileImport(event)">
@@ -403,12 +372,42 @@
       </div>
     </div>
   </div>
-
   <div class="phase2">
-    <b>Note:</b> the loader reads and summarizes whatever you give it, but entries in the rack above still aren't automatically checked against it yet — that scoring/matching layer is the next build.
+    <b>Note:</b> the loader reads and summarizes whatever you give it, but entries in Results below still aren't automatically checked against it yet — that scoring/matching layer is the next build.
   </div>
 
-  <div class="footer-mark">LINEUP v1.0.1 — end of display —</div>
+  <div class="sec-label">Draft entry</div>
+  <div class="deck">
+    <textarea id="wantInput" placeholder="e.g. Weekends off whenever possible, no report before 6am, more Europe pairings, avoid reserve in the first half of the month, keep trips under 4 days..."></textarea>
+    <div class="deck-foot">
+      <span class="hint" id="genHint">Converts to points-weighted bid entries</span>
+      <div style="display:flex; gap:10px;">
+        <button class="pb small" onclick="addManualStrip()">Add manually</button>
+        <button class="pb primary" id="genBtn" onclick="generateRules()">Draft bid</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label">Results <span class="sec-count" id="rackCount">0 entries</span></div>
+  <div class="row-head">
+    <span class="rh-pts">Points</span>
+    <span class="rh-body">Entry</span>
+    <span class="rh-del"></span>
+  </div>
+  <ul id="rack"></ul>
+  <div class="empty-state" id="emptyState">
+    <div class="ee-tag">▲ NO ENTRIES ON FILE</div>
+    Describe what you want above, or add an entry manually.<br>
+    Entries sort automatically by points, high to low.
+  </div>
+
+  <div class="actions" id="actionsRow" style="display:none;">
+    <button class="pb primary" onclick="generateForecast()" id="forecastBtn">Forecast my line</button>
+    <button class="pb" onclick="exportList()">Export list</button>
+    <button class="pb danger" onclick="clearRack()">Clear rack</button>
+  </div>
+
+  <div class="footer-mark">LINEUP v1.1.0 — end of display —</div>
 </div>
 
 <div class="modal-bg" id="exportModal">
